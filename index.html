@@ -2,14 +2,40 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
-  <title>AI Prompt 生成小工具</title>
+  <title>AI Prompt 生成小工具 V_0.3</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
+    :root {
+      --bg: #f5f5f5;
+      --card: #ffffff;
+      --text-main: #111827;
+      --text-sub: #555;
+      --border: #d4d4d4;
+      --shadow: 0 2px 8px rgba(0,0,0,0.06);
+      --primary: #2563eb;
+      --secondary: #e5e7eb;
+      --tip: #6b7280;
+    }
+
+    body.dark {
+      --bg: #0f172a;
+      --card: #111827;
+      --text-main: #e5e7eb;
+      --text-sub: #cbd5e1;
+      --border: #1f2937;
+      --shadow: 0 2px 12px rgba(0,0,0,0.35);
+      --primary: #3b82f6;
+      --secondary: #1f2937;
+      --tip: #94a3b8;
+    }
+
     body {
       margin: 0;
       padding: 0;
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: #f5f5f5;
+      background: var(--bg);
+      color: var(--text-main);
+      transition: background 0.2s ease, color 0.2s ease;
     }
     .container {
       max-width: 720px;
@@ -23,16 +49,18 @@
     }
     .subtitle {
       font-size: 0.9rem;
-      color: #555;
+      color: var(--text-sub);
       text-align: center;
       margin-bottom: 16px;
     }
     .card {
-      background: #ffffff;
+      background: var(--card);
       border-radius: 14px;
       padding: 16px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+      box-shadow: var(--shadow);
       margin-bottom: 16px;
+      border: 1px solid var(--border);
+      transition: background 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
     }
     .field {
       margin-bottom: 12px;
@@ -49,10 +77,11 @@
       width: 100%;
       box-sizing: border-box;
       border-radius: 10px;
-      border: 1px solid #d4d4d4;
+      border: 1px solid var(--border);
       font-size: 0.9rem;
       padding: 8px;
-      background: #ffffff;
+      background: var(--card);
+      color: var(--text-main);
     }
     textarea {
       min-height: 80px;
@@ -74,12 +103,12 @@
       margin-top: 8px;
     }
     .primary-btn {
-      background: #2563eb;
+      background: var(--primary);
       color: white;
     }
     .secondary-btn {
-      background: #e5e7eb;
-      color: #111827;
+      background: var(--secondary);
+      color: var(--text-main);
     }
     .primary-btn:active,
     .secondary-btn:active {
@@ -87,21 +116,51 @@
     }
     .tips {
       font-size: 0.8rem;
-      color: #6b7280;
+      color: var(--tip);
       margin-top: 4px;
       line-height: 1.4;
     }
     .footer {
       font-size: 0.8rem;
-      color: #777;
+      color: var(--tip);
       text-align: center;
       margin-top: 8px;
+    }
+
+    .toolbar {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 8px;
+    }
+
+    .history-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .history-item {
+      border: 1px dashed var(--border);
+      border-radius: 10px;
+      padding: 10px;
+      background: color-mix(in srgb, var(--card) 90%, var(--primary) 10%);
+    }
+
+    .history-actions {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-top: 6px;
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>AI Prompt 生成器</h1>
+    <h1>AI Prompt 生成器 V_0.3</h1>
     <div class="subtitle">把模糊想法变成结构化、可复用的高质量 Prompt。</div>
 
     <!-- 输入区域 -->
@@ -154,7 +213,11 @@
         <textarea id="constraints" placeholder="例如：避免使用专业术语；每条建议前加上编号；使用简体中文；不要编造数据……"></textarea>
       </div>
 
-      <button class="primary-btn" id="generateBtn">生成 Prompt</button>
+      <div class="toolbar">
+        <button class="primary-btn" id="generateBtn" style="flex:1;">生成 Prompt</button>
+        <button class="secondary-btn" id="resetBtn" style="flex:1;">清空输入</button>
+        <button class="secondary-btn" id="themeBtn" style="flex:1;">切换深色模式</button>
+      </div>
     </div>
 
     <!-- 输出区域 -->
@@ -163,10 +226,25 @@
         <label for="output">生成的 Prompt</label>
         <textarea id="output" readonly placeholder="点击上面的“生成 Prompt”按钮后，这里会出现结果。"></textarea>
       </div>
-      <button class="secondary-btn" id="copyBtn">复制 Prompt 到剪贴板</button>
+      <div class="toolbar">
+        <button class="secondary-btn" id="copyBtn" style="flex:1;">复制 Prompt</button>
+        <button class="secondary-btn" id="downloadBtn" style="flex:1;">下载为 .txt</button>
+      </div>
       <div class="tips">
         小提示：你可以把常用 Prompt 保存下来，形成自己的「Prompt 仓库」，以后直接复用。
       </div>
+    </div>
+
+    <div class="card">
+      <div class="field">
+        <label>本地 Prompt 仓库（最多保存 5 条，点击一键复用）</label>
+        <ul class="history-list" id="historyList"></ul>
+      </div>
+      <div class="toolbar">
+        <button class="secondary-btn" id="saveCurrentBtn" style="flex:1;">保存当前 Prompt</button>
+        <button class="secondary-btn" id="clearHistoryBtn" style="flex:1;">清空仓库</button>
+      </div>
+      <div class="tips">提示：保存后会存到浏览器本地，下次打开页面依旧可用。</div>
     </div>
 
     <div class="card" id="clarityCard" style="display:none;">
@@ -193,8 +271,18 @@
     const outputArea = document.getElementById("output");
     const generateBtn = document.getElementById("generateBtn");
     const copyBtn = document.getElementById("copyBtn");
+    const downloadBtn = document.getElementById("downloadBtn");
+    const resetBtn = document.getElementById("resetBtn");
+    const themeBtn = document.getElementById("themeBtn");
+    const saveCurrentBtn = document.getElementById("saveCurrentBtn");
+    const clearHistoryBtn = document.getElementById("clearHistoryBtn");
+    const historyList = document.getElementById("historyList");
     const clarityCard = document.getElementById("clarityCard");
     const clarityList = document.getElementById("clarityList");
+
+    const HISTORY_KEY = "pg_history";
+    const THEME_KEY = "pg_theme";
+    const MAX_HISTORY = 5;
 
     const defaultConstraints = [
       "避免使用含糊词，给出可执行的细节和数字",
@@ -375,6 +463,7 @@
 
       const prompt = buildPrompt(taskText, style, lengthPref, audience, constraints);
       outputArea.value = prompt;
+      saveHistory(taskText, prompt);
       updateClarifyHints();
     });
 
@@ -404,6 +493,135 @@
       }
     });
 
+    downloadBtn.addEventListener("click", function () {
+      const text = outputArea.value;
+      if (!text.trim()) {
+        alert("还没有生成 Prompt。先点上面的『生成 Prompt』。");
+        return;
+      }
+      const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "prompt.txt";
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    resetBtn.addEventListener("click", function () {
+      taskInput.value = "";
+      audienceInput.value = "";
+      constraintsInput.value = "";
+      outputArea.value = "";
+      sceneSelect.value = "";
+      updateClarifyHints();
+    });
+
+    themeBtn.addEventListener("click", function () {
+      const isDark = document.body.classList.toggle("dark");
+      localStorage.setItem(THEME_KEY, isDark ? "dark" : "light");
+      themeBtn.textContent = isDark ? "切换浅色模式" : "切换深色模式";
+    });
+
+    saveCurrentBtn.addEventListener("click", function () {
+      const prompt = outputArea.value.trim();
+      const task = taskInput.value.trim();
+      if (!prompt) {
+        alert("请先生成 Prompt 再保存。");
+        return;
+      }
+      saveHistory(task || "未命名任务", prompt);
+      alert("已保存到本地 Prompt 仓库。");
+    });
+
+    clearHistoryBtn.addEventListener("click", function () {
+      localStorage.removeItem(HISTORY_KEY);
+      renderHistory([]);
+    });
+
+    function saveHistory(task, prompt) {
+      const list = loadHistory();
+      const entry = { task: task.slice(0, 80), prompt, time: new Date().toISOString() };
+      list.unshift(entry);
+      const trimmed = list.slice(0, MAX_HISTORY);
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(trimmed));
+      renderHistory(trimmed);
+    }
+
+    function loadHistory() {
+      try {
+        const raw = localStorage.getItem(HISTORY_KEY);
+        return raw ? JSON.parse(raw) : [];
+      } catch (e) {
+        return [];
+      }
+    }
+
+    function renderHistory(list) {
+      historyList.innerHTML = "";
+      if (!list.length) {
+        const empty = document.createElement("li");
+        empty.textContent = "暂无保存的 Prompt，生成后可点击『保存当前 Prompt』。";
+        empty.style.color = "var(--tip)";
+        historyList.appendChild(empty);
+        return;
+      }
+
+      list.forEach(function (item, idx) {
+        const li = document.createElement("li");
+        li.className = "history-item";
+        const title = document.createElement("div");
+        title.style.fontWeight = "600";
+        title.textContent = "任务" + (list.length - idx) + "：" + item.task;
+        const time = document.createElement("div");
+        time.className = "tips";
+        time.textContent = "保存时间：" + new Date(item.time).toLocaleString();
+
+        const actionRow = document.createElement("div");
+        actionRow.className = "history-actions";
+
+        const applyBtn = document.createElement("button");
+        applyBtn.className = "secondary-btn";
+        applyBtn.style.flex = "1";
+        applyBtn.textContent = "填充到输入区";
+        applyBtn.addEventListener("click", function () {
+          taskInput.value = item.task;
+          outputArea.value = item.prompt;
+          updateClarifyHints();
+          alert("已填充到输入框，可继续编辑。");
+        });
+
+        const copyBtn = document.createElement("button");
+        copyBtn.className = "secondary-btn";
+        copyBtn.style.flex = "1";
+        copyBtn.textContent = "复制这条";
+        copyBtn.addEventListener("click", function () {
+          navigator.clipboard.writeText(item.prompt).then(function () {
+            alert("已复制保存的 Prompt。");
+          });
+        });
+
+        actionRow.appendChild(applyBtn);
+        actionRow.appendChild(copyBtn);
+
+        li.appendChild(title);
+        li.appendChild(time);
+        li.appendChild(actionRow);
+        historyList.appendChild(li);
+      });
+    }
+
+    function restoreTheme() {
+      const theme = localStorage.getItem(THEME_KEY);
+      if (theme === "dark") {
+        document.body.classList.add("dark");
+        themeBtn.textContent = "切换浅色模式";
+      }
+    }
+
+    renderHistory(loadHistory());
+    restoreTheme();
+  
     // 旧浏览器的复制兜底方案
     function fallbackCopy(text) {
       const textarea = document.createElement("textarea");

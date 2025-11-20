@@ -1,4 +1,4 @@
-# AI Prompt 生成器（AI Prompt Generator）V_0.3
+# AI Prompt 生成器（AI Prompt Generator）V_0.4
 
 一个用于 **快速生成结构化高质量 Prompt** 的网页工具（适配手机）。
 通过填写任务描述、选择风格、长度、目标读者等信息，将模糊需求自动转为可复用的 Prompt，并在输入模糊时给出澄清建议。

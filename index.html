@@ -107,6 +107,19 @@
     <!-- 输入区域 -->
     <div class="card">
       <div class="field">
+        <label for="scene">快速场景模板（可选）</label>
+        <select id="scene">
+          <option value="">不使用模板</option>
+          <option value="study">学习 / 复习计划</option>
+          <option value="writing">写作 / 文案</option>
+          <option value="testing">测试用例 / 质量检查</option>
+          <option value="brainstorm">创意发散 / 点子清单</option>
+          <option value="analysis">需求梳理 / 方案分析</option>
+        </select>
+        <div class="tips">选择后会自动填充示例，方便你再按需修改。</div>
+      </div>
+
+      <div class="field">
         <label for="task">1. 你想让 AI 做什么？（任务描述）</label>
         <textarea id="task" placeholder="例如：帮我为正在准备考研的学生设计一份 7 天复习计划，重点加强数学和专业课……"></textarea>
       </div>
@@ -156,6 +169,14 @@
       </div>
     </div>
 
+    <div class="card" id="clarityCard" style="display:none;">
+      <div class="field">
+        <label>澄清与补全建议</label>
+        <ul id="clarityList" style="padding-left: 20px; margin: 4px 0; color:#4b5563; line-height:1.4;"></ul>
+      </div>
+      <div class="tips">根据这些提示补充信息后再生成，Prompt 会更具体、更可复用。</div>
+    </div>
+
     <div class="footer">
       纯前端工具，无任何数据上传到服务器。你可以自由修改和二次开发。
     </div>
@@ -163,6 +184,7 @@
 
   <script>
     // 把 DOM 元素都先拿出来，避免变量名冲突
+    const sceneSelect = document.getElementById("scene");
     const taskInput = document.getElementById("task");
     const styleSelect = document.getElementById("style");
     const lengthSelect = document.getElementById("lengthPref");
@@ -171,6 +193,58 @@
     const outputArea = document.getElementById("output");
     const generateBtn = document.getElementById("generateBtn");
     const copyBtn = document.getElementById("copyBtn");
+    const clarityCard = document.getElementById("clarityCard");
+    const clarityList = document.getElementById("clarityList");
+
+    const defaultConstraints = [
+      "避免使用含糊词，给出可执行的细节和数字",
+      "标注关键假设或前提条件",
+      "输出前先快速列出任务拆解步骤",
+      "不要编造数据或来源，如需假设请说明理由",
+      "用简短标题 + 分条方式呈现，便于浏览"
+    ];
+
+    const sceneTemplates = {
+      study: {
+        task:
+          "为一名在职备考的学习者设计 7 天复习计划，主科目为数学和专业课，兼顾碎片化时间复习。",
+        audience: "在职备考、时间有限的学习者",
+        constraints: "每天输出可完成的任务清单；标注预估时长；提供复习材料来源建议"
+      },
+      writing: {
+        task:
+          "写一篇新品发布会的短文案，突出核心卖点、差异化和号召行动，渠道为微信公众号。",
+        audience: "关注科技资讯的普通用户",
+        constraints: "开头 2 句抓住注意力；用 3~5 个要点呈现卖点；结尾附带行动号召"
+      },
+      testing: {
+        task:
+          "根据功能描述生成测试用例，覆盖正常流、异常流和边界情况，包含预期结果。",
+        audience: "QA 测试工程师",
+        constraints: "用表格列出用例编号、前置条件、步骤、期望；优先高风险路径"
+      },
+      brainstorm: {
+        task:
+          "针对短视频选题进行创意发散，给出 10 个可拍摄的点子，并提供拍摄亮点。",
+        audience: "短视频创作者",
+        constraints: "每个点子一句话概述 + 亮点；避免重复风格；涵盖不同场景/人群"
+      },
+      analysis: {
+        task:
+          "帮助梳理一个软件需求，明确目标用户、核心场景、功能优先级和验收标准。",
+        audience: "产品经理/需求评审参与者",
+        constraints: "按用户故事拆分；为每个功能写验收标准；列出风险与假设"
+      }
+    };
+
+    sceneSelect.addEventListener("change", function () {
+      const tpl = sceneTemplates[sceneSelect.value];
+      if (!tpl) return;
+      taskInput.value = tpl.task;
+      audienceInput.value = tpl.audience;
+      constraintsInput.value = tpl.constraints;
+      updateClarifyHints();
+    });
 
     // 组装 Prompt 的函数
     function buildPrompt(task, style, lengthPref, audience, constraints) {
@@ -178,6 +252,7 @@
 
       lines.push("你现在是一名智能助手，请按照下面的要求来完成任务。");
       lines.push("");
+
       lines.push("【任务描述】");
       lines.push(task.trim());
       lines.push("");
@@ -192,26 +267,97 @@
       lines.push("- " + targetParts.join("，"));
       lines.push("");
 
-      if (constraints.trim()) {
+      const constraintLines = getConstraintLines(constraints);
+      if (constraintLines.length) {
         lines.push("【必须遵守的约束】");
-        constraints
-          .split("\n")
-          .map(function (line) { return line.trim(); })
-          .filter(function (line) { return line.length > 0; })
-          .forEach(function (line) {
-            lines.push("- " + line);
-          });
+        constraintLines.forEach(function (line) {
+          lines.push("- " + line);
+        });
         lines.push("");
       }
 
       lines.push("【输出格式建议】");
-      lines.push("- 先给出一个简短的总体概述（1~2 句）。");
-      lines.push("- 然后使用有层级的条目（例如 1., 1.1, 1.2），按逻辑顺序展开。");
-      lines.push("- 如果合适，可以在最后给出 1 段简短总结或后续建议。");
+      getFormatHints(task, lengthPref).forEach(function (hint) {
+        lines.push("- " + hint);
+      });
       lines.push("");
       lines.push("如果你理解了上述要求，请直接开始输出结果，不要重复这些说明。");
 
       return lines.join("\n");
+    }
+
+    function getConstraintLines(constraints) {
+      const userLines = constraints
+        .split("\n")
+        .map(function (line) { return line.trim(); })
+        .filter(function (line) { return line.length > 0; });
+      if (userLines.length > 0) return userLines;
+      return defaultConstraints;
+    }
+
+    function getFormatHints(task, lengthPref) {
+      const base = [
+        "先给出一个简短的总体概述（1~2 句）",
+        "使用有层级的条目（1., 1.1, 1.2）按逻辑展开"
+      ];
+      const patterns = [
+        { key: /(计划|日程|安排|roadmap|时间线)/, hints: ["按时间顺序列出每日/每阶段任务", "为每个阶段标注目标、成果与验收标准"] },
+        { key: /(写作|文案|文章|总结)/, hints: ["给出大纲或分段标题", "在关键段落提供示例句或金句"] },
+        { key: /(测试|用例|验证)/, hints: ["用表格呈现用例编号、步骤、期望", "区分正常流、异常流、边界情况"] },
+        { key: /(创意|点子|头脑风暴|策划)/, hints: ["多样化场景/受众，避免重复风格", "每条附上亮点或可执行的小步骤"] },
+        { key: /(需求|方案|分析|评审)/, hints: ["分用户角色/场景拆解需求", "列出风险、假设与决策依据"] }
+      ];
+
+      patterns.forEach(function (p) {
+        if (p.key.test(task)) {
+          base.push.apply(base, p.hints);
+        }
+      });
+
+      if (lengthPref.includes("简短")) {
+        base.push("控制在关键要点内，每条不超过 2 行");
+      } else if (lengthPref.includes("详细")) {
+        base.push("可补充示例/表格/代码块以便直接复用");
+      }
+
+      base.push("如有未覆盖的信息，请在总结后列出需补充的清单");
+      return base;
+    }
+
+    function buildClarifyHints(task) {
+      const hints = [];
+      if (task.length < 12) {
+        hints.push("描述太短，补充目标、受众、时限、交付物格式等信息");
+      }
+      if (!/[0-9０-９天周月年]{1,}/.test(task) && /(计划|安排|日程)/.test(task)) {
+        hints.push("计划类任务请写明时间跨度与里程碑");
+      }
+      if (!/格式|表格|输出/.test(task)) {
+        hints.push("补充期望的输出格式（分条、表格、代码块等）");
+      }
+      if (!/受众|用户|读者|人群/.test(task)) {
+        hints.push("说明目标读者/用户（水平、行业、背景）");
+      }
+      if (!/限制|约束|不得|避免/.test(task)) {
+        hints.push("添加限制条件：避免什么？必须包含什么？有无资源/工具限制？");
+      }
+      return hints;
+    }
+
+    function updateClarifyHints() {
+      const taskText = taskInput.value || "";
+      const hints = buildClarifyHints(taskText.trim());
+      clarityList.innerHTML = "";
+      if (!hints.length) {
+        clarityCard.style.display = "none";
+        return;
+      }
+      hints.forEach(function (hint) {
+        const li = document.createElement("li");
+        li.textContent = hint;
+        clarityList.appendChild(li);
+      });
+      clarityCard.style.display = "block";
     }
 
     // 点击“生成 Prompt”
@@ -229,6 +375,12 @@
 
       const prompt = buildPrompt(taskText, style, lengthPref, audience, constraints);
       outputArea.value = prompt;
+      updateClarifyHints();
+    });
+
+    // 输入变化时实时给出澄清提示
+    [taskInput, constraintsInput, audienceInput].forEach(function (el) {
+      el.addEventListener("input", updateClarifyHints);
     });
 
     // 点击“复制 Prompt”

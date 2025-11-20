@@ -127,6 +127,22 @@
       margin-top: 8px;
     }
 
+    .section-title {
+      margin: 0 0 6px;
+      font-size: 1rem;
+      font-weight: 700;
+    }
+
+    .status-pill {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: var(--secondary);
+      color: var(--text-main);
+      font-size: 0.8rem;
+      margin-top: 6px;
+    }
+
     .toolbar {
       display: flex;
       gap: 8px;
@@ -162,6 +178,34 @@
   <div class="container">
     <h1>AI Prompt 生成器 V_0.3</h1>
     <div class="subtitle">把模糊想法变成结构化、可复用的高质量 Prompt。</div>
+
+    <div class="card">
+      <h3 class="section-title">OpenAI API 设置（可选）</h3>
+      <div class="field">
+        <label for="apiKeyInput">API Key（仅保存在本地浏览器，勿提交到仓库或公开场所）</label>
+        <input id="apiKeyInput" type="password" placeholder="sk-..." autocomplete="off" />
+        <div class="tips">页面不会上传密钥；保存在本地存储。如果在公共设备上使用，请生成完 Prompt 后清除密钥。</div>
+      </div>
+      <div class="row">
+        <div class="field" style="flex:1;">
+          <label for="apiBaseInput">API Base（选填）</label>
+          <input id="apiBaseInput" placeholder="https://api.openai.com/v1" />
+        </div>
+        <div class="field" style="flex:1;">
+          <label for="modelSelect">模型</label>
+          <select id="modelSelect">
+            <option value="gpt-4o-mini">gpt-4o-mini</option>
+            <option value="gpt-4o">gpt-4o</option>
+            <option value="o4-mini">o4-mini</option>
+          </select>
+        </div>
+      </div>
+      <div class="toolbar">
+        <button class="secondary-btn" id="saveApiBtn" style="flex:1;">保存（本地）</button>
+        <button class="secondary-btn" id="clearApiBtn" style="flex:1;">清除密钥</button>
+      </div>
+      <div class="status-pill" id="apiStatus">未设置 API Key，仍可使用本地 Prompt 生成。</div>
+    </div>
 
     <!-- 输入区域 -->
     <div class="card">
@@ -215,6 +259,7 @@
 
       <div class="toolbar">
         <button class="primary-btn" id="generateBtn" style="flex:1;">生成 Prompt</button>
+        <button class="primary-btn" id="aiGenerateBtn" style="flex:1;">用 OpenAI 优化 Prompt</button>
         <button class="secondary-btn" id="resetBtn" style="flex:1;">清空输入</button>
         <button class="secondary-btn" id="themeBtn" style="flex:1;">切换深色模式</button>
       </div>
@@ -270,6 +315,7 @@
     const constraintsInput = document.getElementById("constraints");
     const outputArea = document.getElementById("output");
     const generateBtn = document.getElementById("generateBtn");
+    const aiGenerateBtn = document.getElementById("aiGenerateBtn");
     const copyBtn = document.getElementById("copyBtn");
     const downloadBtn = document.getElementById("downloadBtn");
     const resetBtn = document.getElementById("resetBtn");
@@ -279,9 +325,17 @@
     const historyList = document.getElementById("historyList");
     const clarityCard = document.getElementById("clarityCard");
     const clarityList = document.getElementById("clarityList");
+    const apiKeyInput = document.getElementById("apiKeyInput");
+    const apiBaseInput = document.getElementById("apiBaseInput");
+    const modelSelect = document.getElementById("modelSelect");
+    const apiStatus = document.getElementById("apiStatus");
+    const saveApiBtn = document.getElementById("saveApiBtn");
+    const clearApiBtn = document.getElementById("clearApiBtn");
 
     const HISTORY_KEY = "pg_history";
     const THEME_KEY = "pg_theme";
+    const API_CFG_KEY = "pg_api_cfg";
+    const DEFAULT_API_BASE = "https://api.openai.com/v1";
     const MAX_HISTORY = 5;
 
     const defaultConstraints = [
@@ -332,6 +386,61 @@
       audienceInput.value = tpl.audience;
       constraintsInput.value = tpl.constraints;
       updateClarifyHints();
+    });
+
+    function loadApiConfig() {
+      try {
+        const raw = localStorage.getItem(API_CFG_KEY);
+        const parsed = raw ? JSON.parse(raw) : {};
+        return {
+          apiKey: parsed.apiKey || "",
+          apiBase: parsed.apiBase || "",
+          model: parsed.model || "gpt-4o-mini"
+        };
+      } catch (e) {
+        return { apiKey: "", apiBase: "", model: "gpt-4o-mini" };
+      }
+    }
+
+    function saveApiConfig(cfg) {
+      localStorage.setItem(API_CFG_KEY, JSON.stringify(cfg));
+      syncApiConfig(cfg);
+    }
+
+    function clearApiConfig() {
+      localStorage.removeItem(API_CFG_KEY);
+      syncApiConfig({ apiKey: "", apiBase: "", model: "gpt-4o-mini" });
+    }
+
+    function syncApiConfig(cfg) {
+      apiKeyInput.value = cfg.apiKey || "";
+      apiBaseInput.value = cfg.apiBase || "";
+      modelSelect.value = cfg.model || "gpt-4o-mini";
+      if (cfg.apiKey) {
+        apiStatus.textContent = "已在本地保存 API Key，调用时会直接向 " + (cfg.apiBase || DEFAULT_API_BASE) + " 发送请求。";
+      } else {
+        apiStatus.textContent = "未设置 API Key，仍可使用本地 Prompt 生成。";
+      }
+    }
+
+    saveApiBtn.addEventListener("click", function () {
+      const apiKey = apiKeyInput.value.trim();
+      if (!apiKey) {
+        alert("请输入有效的 API Key，切勿将密钥提交到代码仓库。");
+        return;
+      }
+      const cfg = {
+        apiKey,
+        apiBase: apiBaseInput.value.trim(),
+        model: modelSelect.value
+      };
+      saveApiConfig(cfg);
+      alert("已将 API 设置保存到本地浏览器。仅当前设备可用。");
+    });
+
+    clearApiBtn.addEventListener("click", function () {
+      clearApiConfig();
+      alert("已清除本地保存的 API Key。");
     });
 
     // 组装 Prompt 的函数
@@ -448,6 +557,70 @@
       clarityCard.style.display = "block";
     }
 
+    function getEffectiveApiConfig() {
+      const stored = loadApiConfig();
+      return {
+        apiKey: apiKeyInput.value.trim() || stored.apiKey || "",
+        apiBase: apiBaseInput.value.trim() || stored.apiBase || DEFAULT_API_BASE,
+        model: modelSelect.value || stored.model || "gpt-4o-mini"
+      };
+    }
+
+    async function callOpenAi(cfg, payload) {
+      const apiBase = (cfg.apiBase || DEFAULT_API_BASE).replace(/\/$/, "");
+      const url = apiBase + "/chat/completions";
+      const body = {
+        model: cfg.model || "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content:
+              "你是一名 Prompt 工程师，负责将用户提供的表单信息整理成清晰、结构化、可直接复制的大模型 Prompt，用中文分条输出。"
+          },
+          {
+            role: "user",
+            content:
+              "以下是用户填写的任务信息，请生成一条可直接用于 ChatGPT 的 Prompt：\n" +
+              "- 任务描述：" + payload.taskText + "\n" +
+              "- 风格：" + payload.style + "\n" +
+              "- 长度偏好：" + payload.lengthPref + "\n" +
+              "- 目标读者：" + (payload.audience || "未指定") + "\n" +
+              "- 用户约束：" + (payload.constraints || "未提供，可补充通用质量要求") + "\n\n" +
+              "供参考的本地草稿：\n" + payload.draftPrompt +
+              "\n\n请优化、补充必要的澄清项，并输出最终 Prompt。"
+          }
+        ],
+        temperature: 0.7
+      };
+
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer " + cfg.apiKey
+        },
+        body: JSON.stringify(body)
+      });
+
+      if (!res.ok) {
+        let errMsg = "";
+        try {
+          const errBody = await res.json();
+          errMsg = errBody.error?.message || JSON.stringify(errBody);
+        } catch (e) {
+          errMsg = await res.text();
+        }
+        throw new Error(errMsg || "请求失败，状态码 " + res.status);
+      }
+
+      const data = await res.json();
+      const content = data.choices?.[0]?.message?.content?.trim();
+      if (!content) {
+        throw new Error("接口未返回内容，请检查模型或请求参数。");
+      }
+      return content;
+    }
+
     // 点击“生成 Prompt”
     generateBtn.addEventListener("click", function () {
       const taskText = taskInput.value || "";
@@ -465,6 +638,52 @@
       outputArea.value = prompt;
       saveHistory(taskText, prompt);
       updateClarifyHints();
+    });
+
+    aiGenerateBtn.addEventListener("click", async function () {
+      const taskText = taskInput.value || "";
+      if (!taskText.trim()) {
+        alert("请先在『你想让 AI 做什么？』里写一点内容。");
+        return;
+      }
+
+      const cfg = getEffectiveApiConfig();
+      if (!cfg.apiKey) {
+        alert("请先在页面顶部填写并保存有效的 API Key。");
+        return;
+      }
+
+      const style = styleSelect.value;
+      const lengthPref = lengthSelect.value;
+      const audience = audienceInput.value || "";
+      const constraints = constraintsInput.value || "";
+      const draftPrompt = buildPrompt(taskText, style, lengthPref, audience, constraints);
+
+      aiGenerateBtn.disabled = true;
+      aiGenerateBtn.textContent = "调用中...";
+      apiStatus.textContent = "正在向 " + (cfg.apiBase || DEFAULT_API_BASE) + " 请求生成，请稍候...";
+
+      try {
+        const result = await callOpenAi(cfg, {
+          taskText,
+          style,
+          lengthPref,
+          audience,
+          constraints,
+          draftPrompt
+        });
+        outputArea.value = result;
+        saveHistory(taskText, result);
+        updateClarifyHints();
+        apiStatus.textContent = "调用完成，Prompt 已由模型优化。";
+      } catch (err) {
+        console.error(err);
+        alert("调用 OpenAI 失败：" + err.message);
+        apiStatus.textContent = "调用失败，请检查网络、API Key 或 Base 地址。";
+      } finally {
+        aiGenerateBtn.disabled = false;
+        aiGenerateBtn.textContent = "用 OpenAI 优化 Prompt";
+      }
     });
 
     // 输入变化时实时给出澄清提示
@@ -621,6 +840,7 @@
 
     renderHistory(loadHistory());
     restoreTheme();
+    syncApiConfig(loadApiConfig());
   
     // 旧浏览器的复制兜底方案
     function fallbackCopy(text) {

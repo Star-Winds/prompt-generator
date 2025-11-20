@@ -61,7 +61,8 @@
 ## 📸 页面预览（Screenshots）
 
 PE端：
-![截图1](https://github.com/user-attachments/assets/2e6d16c6-3a94-4811-82bb-d81812d26e1b)
+![截图1](https://github.com/user-attachments/assets/58c890d9-6e61-41be-a7ec-f81fcedc033f)
+
 
 PC端：
 <img width="1910" height="923" alt="94df7b63-2f10-4f64-8d5f-728405fd8107" src="https://github.com/user-attachments/assets/03f46485-4fe1-47e5-b99a-9bd019fc057c" />

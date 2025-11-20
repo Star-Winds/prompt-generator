@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
-  <title>AI Prompt 生成器</title>
+  <title>AI Prompt 生成小工具</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     body {
@@ -18,7 +18,7 @@
     }
     h1 {
       font-size: 1.4rem;
-      margin-bottom: 4px;
+      margin: 0 0 4px 0;
       text-align: center;
     }
     .subtitle {
@@ -43,7 +43,9 @@
       font-weight: 600;
       margin-bottom: 4px;
     }
-    textarea, select, input {
+    textarea,
+    select,
+    input {
       width: 100%;
       box-sizing: border-box;
       border-radius: 10px;
@@ -79,14 +81,21 @@
       background: #e5e7eb;
       color: #111827;
     }
-    .output-area {
-      margin-top: 8px;
+    .primary-btn:active,
+    .secondary-btn:active {
+      opacity: 0.85;
     }
     .tips {
       font-size: 0.8rem;
       color: #6b7280;
       margin-top: 4px;
       line-height: 1.4;
+    }
+    .footer {
+      font-size: 0.8rem;
+      color: #777;
+      text-align: center;
+      margin-top: 8px;
     }
   </style>
 </head>
@@ -95,24 +104,26 @@
     <h1>AI Prompt 生成器</h1>
     <div class="subtitle">把模糊想法变成结构化、可复用的高质量 Prompt。</div>
 
+    <!-- 输入区域 -->
     <div class="card">
       <div class="field">
-        <label for="task">1. 任务描述</label>
-        <textarea id="task" placeholder="例如：为考研生设计 7 天复习计划……"></textarea>
+        <label for="task">1. 你想让 AI 做什么？（任务描述）</label>
+        <textarea id="task" placeholder="例如：帮我为正在准备考研的学生设计一份 7 天复习计划，重点加强数学和专业课……"></textarea>
       </div>
 
       <div class="row" style="margin-bottom: 8px;">
         <div class="field" style="flex:1;">
           <label for="style">2. 风格</label>
           <select id="style">
-            <option value="严谨、结构化、条理清晰">严谨结构化</option>
-            <option value="口语化、亲切、易懂">口语易懂</option>
-            <option value="有创意、有比喻、有故事感">创意故事感</option>
+            <option value="严谨、结构化、条理清晰">严谨 · 结构化</option>
+            <option value="口语化、亲切、易懂">口语 · 易懂</option>
+            <option value="有创意、有比喻、有故事感">创意 · 有画面感</option>
           </select>
         </div>
+
         <div class="field" style="flex:1;">
-          <label for="length">3. 长度</label>
-          <select id="length">
+          <label for="lengthPref">3. 输出长度</label>
+          <select id="lengthPref">
             <option value="尽量简短，只保留关键要点">简短</option>
             <option value="适中，兼顾完整性与可读性">适中</option>
             <option value="较为详细，可以展开说明和举例">详细</option>
@@ -122,61 +133,141 @@
 
       <div class="field">
         <label for="audience">4. 目标读者（可选）</label>
-        <input id="audience" placeholder="例如：小白 / 大学生 / 行业从业者" />
+        <input id="audience" placeholder="例如：完全小白 / 有一定基础的大学生 / 行业从业者" />
       </div>
 
       <div class="field">
-        <label for="constraints">5. 约束（可选）</label>
-        <textarea id="constraints" placeholder="例如：禁止使用专业术语；每条前加编号……"></textarea>
+        <label for="constraints">5. 必须遵守的要求（可选）</label>
+        <textarea id="constraints" placeholder="例如：避免使用专业术语；每条建议前加上编号；使用简体中文；不要编造数据……"></textarea>
       </div>
 
       <button class="primary-btn" id="generateBtn">生成 Prompt</button>
     </div>
 
+    <!-- 输出区域 -->
     <div class="card">
       <div class="field">
-        <label for="output">生成结果</label>
-        <textarea id="output" readonly placeholder="这里会显示生成的 Prompt……"></textarea>
+        <label for="output">生成的 Prompt</label>
+        <textarea id="output" readonly placeholder="点击上面的“生成 Prompt”按钮后，这里会出现结果。"></textarea>
       </div>
-      <button class="secondary-btn" id="copyBtn">复制 Prompt</button>
-      <div class="tips">提示：你可以把高质量 Prompt 收藏起来，形成自己的 Prompt 仓库。</div>
+      <button class="secondary-btn" id="copyBtn">复制 Prompt 到剪贴板</button>
+      <div class="tips">
+        小提示：你可以把常用 Prompt 保存下来，形成自己的「Prompt 仓库」，以后直接复用。
+      </div>
+    </div>
+
+    <div class="footer">
+      纯前端工具，无任何数据上传到服务器。你可以自由修改和二次开发。
     </div>
   </div>
 
   <script>
+    // 把 DOM 元素都先拿出来，避免变量名冲突
+    const taskInput = document.getElementById("task");
+    const styleSelect = document.getElementById("style");
+    const lengthSelect = document.getElementById("lengthPref");
+    const audienceInput = document.getElementById("audience");
+    const constraintsInput = document.getElementById("constraints");
+    const outputArea = document.getElementById("output");
+    const generateBtn = document.getElementById("generateBtn");
+    const copyBtn = document.getElementById("copyBtn");
+
+    // 组装 Prompt 的函数
     function buildPrompt(task, style, lengthPref, audience, constraints) {
       let lines = [];
-      lines.push("你现在是一名智能助手，请按照下面的要求完成任务。\n");
-      lines.push("【任务描述】\n" + task.trim() + "\n");
+
+      lines.push("你现在是一名智能助手，请按照下面的要求来完成任务。");
+      lines.push("");
+      lines.push("【任务描述】");
+      lines.push(task.trim());
+      lines.push("");
+
       lines.push("【输出目标】");
-      let t = ["使用" + style + "的表达方式", lengthPref];
-      if (audience.trim()) t.push("目标读者：" + audience.trim());
-      lines.push("- " + t.join("，") + "\n");
+      let targetParts = [];
+      targetParts.push("使用" + style + "的表达方式");
+      targetParts.push(lengthPref);
+      if (audience.trim()) {
+        targetParts.push("面向的目标读者是：" + audience.trim());
+      }
+      lines.push("- " + targetParts.join("，"));
+      lines.push("");
+
       if (constraints.trim()) {
         lines.push("【必须遵守的约束】");
-        constraints.split("\n").map(s=>s.trim()).filter(s=>s).forEach(s=>{
-          lines.push("- " + s);
-        });
+        constraints
+          .split("\n")
+          .map(function (line) { return line.trim(); })
+          .filter(function (line) { return line.length > 0; })
+          .forEach(function (line) {
+            lines.push("- " + line);
+          });
         lines.push("");
       }
-      lines.push("【输出格式】");
-      lines.push("- 开头给一个 1-2 句概述");
-      lines.push("- 使用分层条目（1. 1.1 等）展开细节");
-      lines.push("- 最后给一个简短总结\n");
-      lines.push("请直接开始输出，不要重复上述说明。");
+
+      lines.push("【输出格式建议】");
+      lines.push("- 先给出一个简短的总体概述（1~2 句）。");
+      lines.push("- 然后使用有层级的条目（例如 1., 1.1, 1.2），按逻辑顺序展开。");
+      lines.push("- 如果合适，可以在最后给出 1 段简短总结或后续建议。");
+      lines.push("");
+      lines.push("如果你理解了上述要求，请直接开始输出结果，不要重复这些说明。");
+
       return lines.join("\n");
     }
 
-    document.getElementById("generateBtn").onclick = function () {
-      let task = task.value.trim();
-      if (!task) return alert("请填写任务描述。");
-      output.value = buildPrompt(task, style.value, length.value, audience.value, constraints.value);
-    };
+    // 点击“生成 Prompt”
+    generateBtn.addEventListener("click", function () {
+      const taskText = taskInput.value || "";
+      if (!taskText.trim()) {
+        alert("请先在『你想让 AI 做什么？』里写一点内容。");
+        return;
+      }
 
-    document.getElementById("copyBtn").onclick = function () {
-      if (!output.value.trim()) return alert("没有可复制的内容。");
-      navigator.clipboard.writeText(output.value).then(()=>alert("已复制！")).catch(()=>alert("复制失败，请手动复制"));
-    };
+      const style = styleSelect.value;
+      const lengthPref = lengthSelect.value;
+      const audience = audienceInput.value || "";
+      const constraints = constraintsInput.value || "";
+
+      const prompt = buildPrompt(taskText, style, lengthPref, audience, constraints);
+      outputArea.value = prompt;
+    });
+
+    // 点击“复制 Prompt”
+    copyBtn.addEventListener("click", function () {
+      const text = outputArea.value;
+      if (!text.trim()) {
+        alert("还没有生成 Prompt。先点上面的『生成 Prompt』。");
+        return;
+      }
+
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text)
+          .then(function () {
+            alert("已复制到剪贴板，可以粘贴到 ChatGPT 里使用。");
+          })
+          .catch(function () {
+            fallbackCopy(text);
+          });
+      } else {
+        fallbackCopy(text);
+      }
+    });
+
+    // 旧浏览器的复制兜底方案
+    function fallbackCopy(text) {
+      const textarea = document.createElement("textarea");
+      textarea.value = text;
+      textarea.style.position = "fixed";
+      textarea.style.opacity = "0";
+      document.body.appendChild(textarea);
+      textarea.select();
+      try {
+        document.execCommand("copy");
+        alert("已复制到剪贴板，可以粘贴到 ChatGPT 里使用。");
+      } catch (e) {
+        alert("复制可能失败了，可以手动全选后复制。");
+      }
+      document.body.removeChild(textarea);
+    }
   </script>
 </body>
 </html>

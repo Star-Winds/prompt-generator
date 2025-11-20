@@ -60,10 +60,11 @@
 
 ## 📸 页面预览（Screenshots）
 
->（你可以在这里放手机截图，格式示例如下）
+PE端：
+![截图1](https://github.com/user-attachments/assets/2e6d16c6-3a94-4811-82bb-d81812d26e1b)
 
-![demo screenshot 1](./screenshot1.png)  
-![demo screenshot 2](./screenshot2.png)
+PC端：
+<img width="1910" height="923" alt="94df7b63-2f10-4f64-8d5f-728405fd8107" src="https://github.com/user-attachments/assets/03f46485-4fe1-47e5-b99a-9bd019fc057c" />
 
 ---
 
